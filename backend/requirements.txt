@@ -1,0 +1,28 @@
+# Django
+Django==5.0
+djangorestframework==3.14.0
+djangorestframework-simplejwt==5.3.1
+
+# Database
+PyMySQL==1.1.1
+
+# CORS
+django-cors-headers==4.3.1
+
+# Filtering
+django-filter==23.5
+
+# Environment variables
+python-decouple==3.8
+
+# Production server
+gunicorn==21.2.0
+
+# Monitoring and logging
+sentry-sdk==1.40.4
+
+# Development
+black==24.1.1
+flake8==7.0.0
+isort==5.13.2
+django-extensions==3.2.3
