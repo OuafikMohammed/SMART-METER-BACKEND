@@ -1,7 +1,7 @@
 """Energy admin configuration."""
 from django.contrib import admin
 
-from energy.models import ActionLog, Alerte, Anomalie, Consommation, ConversationIA, Foyer
+from .models import ActionLog, Alerte, Anomalie, Consommation, ConversationIA, Foyer
 
 
 @admin.register(Foyer)

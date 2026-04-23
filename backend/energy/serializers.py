@@ -1,7 +1,7 @@
 """REST API serializers pour l'app energy."""
 from rest_framework import serializers
 
-from energy.models import ActionLog, Alerte, Anomalie, Consommation, ConversationIA, Foyer
+from .models import ActionLog, Alerte, Anomalie, Consommation, ConversationIA, Foyer
 
 
 class FoyerSerializer(serializers.ModelSerializer):

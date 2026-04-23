@@ -1,54 +1,78 @@
 """
-Modeles ORM pour l'application Energy (SmartMeter).
-7 modeles: Foyer, Consommation, Anomalie, Alerte, ConversationIA, ActionLog + User (dans app users).
+Modèles ORM pour l'application Energy (SmartMeter).
+7 modèles: Foyer, Consommation, Anomalie, Alerte, ConversationIA, ActionLog + User (dans app users).
 """
-from django.contrib.auth import get_user_model
-from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.utils import timezone
+from django.contrib.auth import get_user_model
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 User = get_user_model()
 
 
 class Foyer(models.Model):
-    """Represente un foyer avec ses appareils et sa consommation electrique."""
-
+    """
+    Représente un foyer (ménage) avec ses appareils et sa consommation électrique.
+    Un foyer peut avoir plusieurs résidents (RG3).
+    """
+    
+    # Identifiant unique du foyer
     numero_foyer = models.CharField(max_length=50, unique=True, db_index=True)
+    
+    # Localisation du foyer
     adresse = models.TextField()
     code_postal = models.CharField(max_length=10)
     ville = models.CharField(max_length=100)
+    
+    # Informations technique
     puissance_souscrite = models.FloatField(help_text="Puissance souscrite en kW")
+    
+    # Métadonnées
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     is_active = models.BooleanField(default=True)
-
+    
     class Meta:
         db_table = 'energy_foyer'
         verbose_name = 'Foyer'
         verbose_name_plural = 'Foyers'
         ordering = ['numero_foyer']
-
+    
     def __str__(self):
         return f"Foyer {self.numero_foyer} - {self.adresse}"
 
 
 class Consommation(models.Model):
-    """Enregistre la consommation electrique pour chaque foyer."""
-
+    """
+    Enregistre la consommation électrique pour chaque foyer.
+    Timestamp: moment de la mesure, kwh: consommation en kWh.
+    anomaly_label: label ML détecté, temperature: température ambiante.
+    
+    Respecte RG3 : accès selon le rôle (RESIDENT voir son foyer, ADMIN tout voir).
+    """
+    
+    # Clé étrangère vers le foyer
     foyer = models.ForeignKey(
         Foyer,
         on_delete=models.CASCADE,
         related_name='consommations',
-        db_index=True,
+        db_index=True
     )
+    
+    # Mesure de consommation
     timestamp = models.DateTimeField(db_index=True, help_text="Heure de la mesure")
     kwh = models.FloatField(help_text="Consommation en kWh")
+    
+    # Détection anomalie (ML)
     anomaly_label = models.CharField(
         max_length=50,
         null=True,
         blank=True,
-        help_text="Label d'anomalie detecte par ML",
+        help_text="Label d'anomalie détecté par ML (ex: 'pic', 'anomalie_consommation')"
     )
-    temperature = models.FloatField(null=True, blank=True, help_text="Temperature ambiante en degres C")
+    
+    # Contexte
+    temperature = models.FloatField(null=True, blank=True, help_text="Température ambiante en °C")
 
     class Meta:
         db_table = 'energy_consommation'
@@ -87,7 +111,7 @@ class Anomalie(models.Model):
     )
     score_confiance = models.FloatField(
         help_text="Score de confiance de l'anomalie [0.0, 1.0]",
-        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)]
     )
     severite = models.CharField(max_length=20, choices=SEVERITE_CHOICES, default='MOYENNE')
     statut = models.CharField(max_length=20, choices=STATUT_CHOICES, default='NOUVELLE')

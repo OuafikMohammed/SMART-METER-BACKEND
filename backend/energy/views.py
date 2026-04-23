@@ -6,15 +6,15 @@ from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-from energy.models import Alerte, Anomalie, Consommation, ConversationIA, Foyer
-from energy.serializers import (
+from .models import Alerte, Anomalie, Consommation, ConversationIA, Foyer
+from .serializers import (
     AlerteSerializer,
     AnomalieSerializer,
     ConsommationSerializer,
     ConversationIASerializer,
     FoyerSerializer,
 )
-from utils_logging import get_client_ip, log_action
+from .utils_logging import get_client_ip, log_action
 
 
 class FoyerViewSet(viewsets.ReadOnlyModelViewSet):

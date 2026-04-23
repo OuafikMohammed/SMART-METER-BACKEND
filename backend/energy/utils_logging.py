@@ -2,7 +2,7 @@
 Helper pour tracer les actions utilisateur (RG20).
 Toutes les actions importantes doivent être loggées via log_action().
 """
-from energy.models import ActionLog
+from .models import ActionLog
 import json
 
 

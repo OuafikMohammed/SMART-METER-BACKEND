@@ -2,7 +2,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from energy.views import AlerteViewSet, AnomalieViewSet, ConsommationViewSet, ConversationIAViewSet, FoyerViewSet
+from .views import AlerteViewSet, AnomalieViewSet, ConsommationViewSet, ConversationIAViewSet, FoyerViewSet
 
 router = DefaultRouter()
 router.register(r'foyers', FoyerViewSet, basename='foyer')
