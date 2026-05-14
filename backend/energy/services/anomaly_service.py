@@ -1,9 +1,9 @@
 """
 Service de détection et classification des anomalies.
-RG7, RG8, RG9, RG10: Détection, score Hugging Face, statuts, alertes.
+RG7, RG8, RG9, RG10: Détection, score Nvidia API, statuts, alertes.
 """
 import logging
-import requests
+import os
 from django.conf import settings
 from django.utils import timezone
 from django.core.mail import send_mail
@@ -12,79 +12,77 @@ from energy.models import Anomalie, Alerte, Consommation
 
 logger = logging.getLogger(__name__)
 
+# Configuration Nvidia API
+NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY') or getattr(settings, 'NVIDIA_API_KEY', None)
+NVIDIA_MODEL = "nvidia/llama-3.1-nemotron-nano-8b-v1"
 
-def obtenir_score_huggingface(kwh_value: float) -> float:
+# Import OpenAI client (compatible with Nvidia API)
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logger.warning("openai module not available")
+
+
+def obtenir_score_nvidia(kwh_value: float) -> float:
     """
-    Appelle l'API Hugging Face pour obtenir un score de confiance (0.0 → 1.0).
+    Obtient un score de confiance d'anomalie via Nvidia API.
     
-    RG8: Score Hugging Face de [0.0, 1.0]
+    RG8: Score Nvidia de [0.0, 1.0]
     
     Args:
         kwh_value: Valeur de consommation en kWh
         
     Returns:
         float: Score de confiance entre 0.0 et 1.0
-        En cas d'erreur (timeout, rate limit, API down), retourne 0.5
+        En cas d'erreur (timeout, API down), retourne 0.5
     """
+    # Si pas de clé API ou openai non disponible, retourner score neutre
+    if not NVIDIA_API_KEY or not OPENAI_AVAILABLE:
+        logger.warning("Nvidia API key ou openai module non disponibles, retour score neutre 0.5")
+        return 0.5
+    
     try:
-        # Vérifier que la clé API Hugging Face est configurée
-        hf_api_key = getattr(settings, 'HUGGINGFACE_API_KEY', None)
-        if not hf_api_key:
-            logger.warning("HUGGINGFACE_API_KEY non configurée en settings")
-            return 0.5
-        
-        # Constructeur du prompt pour classification texte
-        prompt = f"Electricity consumption spike detected: {kwh_value} kWh unusually high"
-        
-        # URL de l'API Hugging Face
-        api_url = "https://api-inference.huggingface.co/models/distilbert-base-uncased-finetuned-sst-2-english"
-        
-        # Headers avec authentification
-        headers = {
-            "Authorization": f"Bearer {hf_api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        # Payload pour l'API
-        payload = {
-            "inputs": prompt,
-            "options": {"wait_for_model": True}  # Attendre si le modèle est chargé
-        }
-        
-        # Appel à l'API (timeout 15s)
-        response = requests.post(
-            api_url,
-            json=payload,
-            headers=headers,
-            timeout=15
+        # Créer client OpenAI pointant vers Nvidia
+        client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=NVIDIA_API_KEY
         )
         
-        # Vérifier le code de statut
-        if response.status_code != 200:
-            logger.error(f"Hugging Face API error: {response.status_code} - {response.text}")
+        # Prompt pour obtenir un score d'anomalie
+        prompt = (
+            f"Given an electricity consumption value of {kwh_value} kWh, "
+            f"determine if this represents an anomaly on a scale from 0.0 (definitely normal) to 1.0 (definitely anomalous). "
+            f"Consider typical household consumption patterns. "
+            f"Respond with ONLY a decimal number between 0.0 and 1.0, nothing else."
+        )
+        
+        # Appeler le modèle
+        response = client.chat.completions.create(
+            model=NVIDIA_MODEL,
+            messages=[
+                {"role": "system", "content": "You are an anomaly detection system. Respond with only a decimal score between 0.0 and 1.0."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,  # Low temperature for consistent scoring
+            max_tokens=10
+        )
+        
+        # Extraire et parser le score
+        score_text = response.choices[0].message.content.strip()
+        try:
+            score = float(score_text)
+            # Assurer que le score est dans [0.0, 1.0]
+            score = max(0.0, min(1.0, score))
+            logger.info(f"Score Nvidia obtenu: {score} pour {kwh_value} kWh")
+            return score
+        except ValueError:
+            logger.warning(f"Score Nvidia non parsable: {score_text}")
             return 0.5
         
-        # Parser la réponse
-        result = response.json()
-        
-        # Extraire le score du label POSITIVE
-        # Format attendu: [{"label": "POSITIVE", "score": 0.95}, {"label": "NEGATIVE", "score": 0.05}]
-        if isinstance(result, list) and len(result) > 0:
-            scores = {item['label']: item['score'] for item in result}
-            # Retourner le score POSITIVE (ou 0.5 par défaut)
-            return scores.get('POSITIVE', 0.5)
-        
-        logger.warning(f"Format de réponse Hugging Face inattendu: {result}")
-        return 0.5
-        
-    except requests.exceptions.Timeout:
-        logger.error("Timeout lors de l'appel Hugging Face API")
-        return 0.5
-    except requests.exceptions.RequestException as e:
-        logger.error(f"Erreur lors de l'appel Hugging Face API: {e}")
-        return 0.5
     except Exception as e:
-        logger.error(f"Erreur inattendue dans obtenir_score_huggingface: {e}")
+        logger.error(f"Erreur lors de l'appel Nvidia API: {str(e)}")
         return 0.5
 
 
@@ -141,8 +139,8 @@ def traiter_nouvelles_anomalies() -> dict:
         
         for consommation in consommations_anormales:
             try:
-                # RG8: Obtenir le score Hugging Face
-                score = obtenir_score_huggingface(consommation.kwh)
+                # RG8: Obtenir le score Nvidia
+                score = obtenir_score_nvidia(consommation.kwh)
                 
                 # Classifier la sévérité
                 severite = classifier_severite(score)

@@ -287,11 +287,11 @@ LOGGING = {
 }
 
 # ========================
-# SPRINT 3: Hugging Face & Email Configuration
+# API Configuration: Nvidia/OpenAI
 # ========================
 
-# Hugging Face API Key (RG8: Score Hugging Face, Sprint 4: IA Chat)
-HF_API_KEY = os.environ.get('HUGGINGFACE_API_KEY', '')
+# Nvidia API Key (RG8: Score Nvidia, Sprint 4: IA Chat with LLaMA 3.1 Nemotron)
+NVIDIA_API_KEY = os.environ.get('NVIDIA_API_KEY', '')
 
 # Email Configuration (RG11: Notifications email)
 EMAIL_BACKEND = os.environ.get(

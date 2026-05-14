@@ -3,12 +3,12 @@ Service IA pour l'assistant conversationnel SmartMeter.
 
 Fournit:
 1. Récupération du contexte MySQL (consommation du foyer)
-2. Intégration Hugging Face (Mistral ou Flan-T5)
+2. Intégration Nvidia/OpenAI API (LLaMA 3.1 Nemotron)
 3. Génération de réponses IA en français
 """
 
 import logging
-import requests
+import os
 from datetime import timedelta
 from django.utils import timezone
 from django.db.models import Sum, Avg, Max, Count
@@ -18,11 +18,17 @@ from energy.models import Consommation, Anomalie
 
 logger = logging.getLogger(__name__)
 
-# Configuration Hugging Face
-HUGGINGFACE_API_KEY = getattr(settings, 'HUGGINGFACE_API_KEY', None)
-HF_API_URL = "https://api-inference.huggingface.co/models"
-HF_MODEL_PRIMARY = "mistralai/Mistral-7B-Instruct-v0.1"
-HF_MODEL_FALLBACK = "google/flan-t5-large"
+# Configuration Nvidia API
+NVIDIA_API_KEY = os.getenv('NVIDIA_API_KEY') or getattr(settings, 'NVIDIA_API_KEY', None)
+NVIDIA_MODEL = "nvidia/llama-3.1-nemotron-nano-8b-v1"
+
+# Import OpenAI client (compatible with Nvidia API)
+try:
+    from openai import OpenAI
+    OPENAI_AVAILABLE = True
+except ImportError:
+    OPENAI_AVAILABLE = False
+    logger.warning("openai module not available")
 
 
 def construire_contexte_consommation(foyer_id: int) -> str:
@@ -92,79 +98,57 @@ def construire_contexte_consommation(foyer_id: int) -> str:
         return "Contexte de consommation: données indisponibles."
 
 
-def appeler_huggingface(prompt: str, model: str = None) -> str:
+def appeler_nvidia(prompt: str) -> str:
     """
-    Appelle l'API Hugging Face pour générer une réponse IA.
+    Appelle l'API Nvidia pour générer une réponse IA.
     
-    Utilise Mistral-7B par défaut, fallback sur Flan-T5 en cas d'erreur.
-    Accepte aussi directement les prompts sans clé API (mode graceful).
+    Utilise LLaMA 3.1 Nemotron via OpenAI compatible API.
     
     Args:
         prompt: Prompt complète avec contexte
-        model: Modèle optionnel (fallback sur PRIMARY si None)
         
     Returns:
         str: Réponse générée en français, ou message d'erreur gracieux
         
     Example:
-        >>> reponse = appeler_huggingface("Quelle est ma consommation moyenne?")
+        >>> reponse = appeler_nvidia("Quelle est ma consommation moyenne?")
         >>> print(reponse)
         "D'après vos données, votre consommation moyenne..."
     """
-    if model is None:
-        model = HF_MODEL_PRIMARY
-    
-    # Graceful mode: si pas de clé API, retourner réponse par défaut
-    if not HUGGINGFACE_API_KEY:
-        logger.warning("Aucune clé HuggingFace API configurée, mode graceful")
+    # Graceful mode: si pas de clé API ou openai non disponible, retourner réponse par défaut
+    if not NVIDIA_API_KEY or not OPENAI_AVAILABLE:
+        logger.warning("Nvidia API key ou openai module non disponibles, mode graceful")
         return (
             "Je suis en mode démo. Pour des recommandations personnalisées, "
-            "configurez votre clé Hugging Face dans les variables d'environnement."
+            "configurez votre clé Nvidia API dans les variables d'environnement."
         )
     
     try:
-        url = f"{HF_API_URL}/{model}"
-        headers = {
-            "Authorization": f"Bearer {HUGGINGFACE_API_KEY}",
-            "Content-Type": "application/json",
-        }
-        payload = {
-            "inputs": prompt,
-            "parameters": {
-                "max_new_tokens": 300,
-                "temperature": 0.7,
-                "return_full_text": False,
-            },
-        }
+        # Créer client OpenAI pointant vers Nvidia
+        client = OpenAI(
+            base_url="https://integrate.api.nvidia.com/v1",
+            api_key=NVIDIA_API_KEY
+        )
         
-        # Appeler l'API avec timeout
-        response = requests.post(url, json=payload, headers=headers, timeout=30)
-        response.raise_for_status()
+        # Appeler le modèle
+        response = client.chat.completions.create(
+            model=NVIDIA_MODEL,
+            messages=[
+                {"role": "system", "content": "Tu es un assistant intelligent pour l'analyse de consommation électrique. Réponds en français, de manière concise et utile."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+            max_tokens=300,
+            top_p=0.9
+        )
         
-        # Parser la réponse
-        result = response.json()
-        if isinstance(result, list) and len(result) > 0:
-            generated_text = result[0].get('generated_text', '')
-            logger.info(f"Réponse HF reçue ({model}): {len(generated_text)} chars")
-            return generated_text.strip()
+        # Extraire la réponse
+        generated_text = response.choices[0].message.content.strip()
+        logger.info(f"Réponse Nvidia reçue: {len(generated_text)} chars")
+        return generated_text
         
-        logger.warning(f"Réponse HF vide ou format inattendu: {result}")
-        return "Désolé, je n'ai pas pu générer de réponse. Veuillez réessayer."
-        
-    except requests.exceptions.Timeout:
-        logger.error("Timeout lors de l'appel HuggingFace")
-        return "L'IA met trop de temps à répondre. Veuillez réessayer plus tard."
-    except requests.exceptions.HTTPError as e:
-        logger.error(f"Erreur HTTP HuggingFace: {str(e)}")
-        
-        # Si erreur 429 (rate limit), utiliser fallback
-        if e.response.status_code == 429 and model == HF_MODEL_PRIMARY:
-            logger.info(f"Rate limit atteint, tentative avec {HF_MODEL_FALLBACK}")
-            return appeler_huggingface(prompt, model=HF_MODEL_FALLBACK)
-        
-        return "Erreur lors de la communication avec l'IA. Veuillez réessayer."
     except Exception as e:
-        logger.error(f"Erreur lors de l'appel HuggingFace: {str(e)}")
+        logger.error(f"Erreur lors de l'appel Nvidia API: {str(e)}")
         return "Une erreur inattendue s'est produite. Veuillez réessayer."
 
 
@@ -204,8 +188,8 @@ def generer_reponse_ia(foyer_id: int, question: str) -> str:
         
         logger.info(f"Générant réponse IA pour foyer {foyer_id}")
         
-        # Appeler Hugging Face
-        reponse = appeler_huggingface(prompt)
+        # Appeler Nvidia API
+        reponse = appeler_nvidia(prompt)
         
         logger.info(f"Réponse IA générée pour foyer {foyer_id}")
         return reponse

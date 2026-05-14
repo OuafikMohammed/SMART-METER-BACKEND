@@ -11,15 +11,19 @@ admin1_password = "pass123"
 admin2_email = "youneseljonhy@gmail.com"
 admin2_password = "pass123"
 
-def get_token(email, password):
+def get_token(email, password, username=None):
     """Get JWT token."""
+    # Use username if provided, otherwise derive from email
+    if not username:
+        username = email.split("@")[0]
+    
     response = requests.post(
         f"{BASE_URL}/api/auth/login/",
-        json={"email": email, "password": password}
+        json={"username": username, "password": password}
     )
     if response.status_code == 200:
         return response.json().get("access")
-    print(f"Login failed for {email}: {response.status_code}")
+    print(f"Login failed for {username}: {response.status_code}")
     print(response.text)
     return None
 
@@ -53,7 +57,7 @@ print("=" * 80)
 
 # Test Admin 1
 print("\n[ADMIN 1] houdamouttalib@gmail.com")
-token1 = get_token(admin1_email, admin1_password)
+token1 = get_token(admin1_email, admin1_password, "admin_houda")
 
 if token1:
     print("  Endpoints:")
@@ -69,7 +73,7 @@ else:
 
 # Test Admin 2
 print("\n[ADMIN 2] youneseljonhy@gmail.com")
-token2 = get_token(admin2_email, admin2_password)
+token2 = get_token(admin2_email, admin2_password, "admin_younes")
 
 if token2:
     print("  Endpoints:")

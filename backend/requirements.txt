@@ -15,8 +15,11 @@ django-filter==23.5
 # Environment variables
 python-decouple==3.8
 
-# HTTP requests (for Hugging Face API)
+# HTTP requests
 requests==2.31.0
+
+# OpenAI/Nvidia API
+openai>=1.0.0
 
 # Data processing
 pandas==2.1.0

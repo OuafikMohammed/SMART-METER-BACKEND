@@ -21,7 +21,6 @@ from .views_smartmeter import (
     AdminResidentsListView as AdminResidentsListViewNew,
     AdminDashboardView,
     AdminFoyersListView as AdminFoyersListViewNew,
-    AdminAnomaliesListView,
     AdminAnalyticsConsumptionView,
     AdminAnalyticsTopConsumersView,
     AdminAnalyticsStatsView,
@@ -52,7 +51,6 @@ urlpatterns = [
     path('admin/residents/', AdminResidentsListViewNew.as_view(), name='admin-residents'),
     path('admin/dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
     path('admin/foyers/', AdminFoyersListViewNew.as_view(), name='admin-foyers'),
-    path('admin/anomalies/', AdminAnomaliesListView.as_view(), name='admin-anomalies'),
     
     # Admin analytics endpoints
     path('admin/analytics/consumption/', AdminAnalyticsConsumptionView.as_view(), name='admin-analytics-consumption'),
