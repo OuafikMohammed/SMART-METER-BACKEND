@@ -1,7 +1,7 @@
 """Energy admin configuration."""
 from django.contrib import admin
 
-from .models import ActionLog, Alerte, Anomalie, Consommation, ConversationIA, Foyer
+from .models import ActionLog, Alerte, Anomalie, Consommation, ConversationIA, Foyer, ConsumptionReading
 
 
 @admin.register(Foyer)
@@ -155,3 +155,45 @@ class ActionLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ConsumptionReading)
+class ConsumptionReadingAdmin(admin.ModelAdmin):
+    """Admin pour les lectures de consommation (Cahier des Charges)."""
+    list_display = (
+        'resident_email',
+        'meter_id',
+        'timestamp',
+        'consumption_kwh',
+        'cost_estimate',
+        'tariff_type',
+    )
+    list_filter = ('timestamp', 'tariff_type', 'meter_id', 'resident')
+    search_fields = ('resident__email', 'meter_id')
+    readonly_fields = ('created_at', 'updated_at')
+    date_hierarchy = 'timestamp'
+    
+    fieldsets = (
+        ('Résident', {
+            'fields': ('resident',)
+        }),
+        ('Mesure', {
+            'fields': (
+                'meter_id',
+                'timestamp',
+                'consumption_kwh',
+                'cost_estimate',
+                'tariff_type',
+            )
+        }),
+        ('Métadonnées', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    def resident_email(self, obj):
+        """Afficher l'email du résident."""
+        return obj.resident.email
+    resident_email.short_description = 'Résident'
+

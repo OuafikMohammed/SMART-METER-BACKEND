@@ -12,15 +12,6 @@ import os
 from pathlib import Path
 from datetime import timedelta
 
-# Only import pymysql if needed for MySQL
-DB_ENGINE = os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3')
-if DB_ENGINE == 'django.db.backends.mysql':
-    try:
-        import pymysql
-        pymysql.install_as_MySQLdb()
-    except ImportError:
-        pass
-
 # Build paths
 BASE_DIR = Path(__file__).resolve().parent.parent
 LOG_DIR = BASE_DIR / 'logs'
@@ -41,9 +32,17 @@ if ENV_FILE.exists():
         key, value = line.split('=', 1)
         os.environ.setdefault(key.strip(), value.strip().strip('"').strip("'"))
 
+# Only import pymysql if needed for MySQL (AFTER loading .env)
+DB_ENGINE = os.environ.get('DB_ENGINE', 'django.db.backends.sqlite3')
+if DB_ENGINE == 'django.db.backends.mysql':
+    try:
+        import pymysql
+        pymysql.install_as_MySQLdb()
+    except ImportError:
+        pass
 
 def env_bool(name, default=False):
-    value = os.environ.get(name)
+    value = os.environ.get(name)    
     if value is None:
         return default
     return value.strip().lower() in {'1', 'true', 'yes', 'on'}

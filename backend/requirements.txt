@@ -18,6 +18,9 @@ python-decouple==3.8
 # HTTP requests (for Hugging Face API)
 requests==2.31.0
 
+# Data processing
+pandas==2.1.0
+
 # Production server
 gunicorn==21.2.0
 

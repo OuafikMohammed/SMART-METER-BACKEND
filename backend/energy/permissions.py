@@ -73,3 +73,52 @@ class EstProprietaireFoyer(BasePermission):
             request.user.role == 'RESIDENT' and
             request.user.foyer_id == foyer.id
         )
+
+
+class IsAdminRole(BasePermission):
+    """
+    Autorise uniquement les utilisateurs avec rôle ADMIN.
+    Utilisé pour les endpoints admin du Cahier des Charges.
+    """
+    message = "Seuls les administrateurs peuvent accéder à cette ressource."
+    
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            request.user.role == 'ADMIN'
+        )
+
+
+class IsResidentRole(BasePermission):
+    """
+    Autorise uniquement les utilisateurs avec rôle RESIDENT.
+    Utilisé pour les endpoints résident du Cahier des Charges.
+    """
+    message = "Seuls les résidents peuvent accéder à cette ressource."
+    
+    def has_permission(self, request, view):
+        return (
+            request.user and 
+            request.user.is_authenticated and 
+            request.user.role == 'RESIDENT'
+        )
+
+
+class CanViewConsumptionReading(BasePermission):
+    """
+    Permissions pour les lectures de consommation (ConsumptionReading):
+    - ADMIN : peut voir les lectures de ses résidents seulement
+    - RESIDENT : peut voir uniquement ses propres lectures
+    """
+    message = "Vous n'avez pas accès à cette lecture de consommation."
+    
+    def has_object_permission(self, request, view, obj):
+        if request.user.role == 'ADMIN':
+            # Admin peut voir les lectures des résidents qu'il gère
+            return obj.resident.managed_by == request.user
+        elif request.user.role == 'RESIDENT':
+            # Résident voit uniquement ses propres lectures
+            return obj.resident == request.user
+        return False
+

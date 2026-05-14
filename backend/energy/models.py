@@ -294,3 +294,88 @@ class ActionLog(models.Model):
 
     def __str__(self):
         return f"{self.utilisateur.username} - {self.action} - {self.timestamp}"
+
+
+class ConsumptionReading(models.Model):
+    """
+    Modèle pour les lectures de consommation électrique des résidents.
+    
+    Selon le Cahier des Charges :
+    - Chaque résident possède ses propres données de consommation
+    - Les admins voient les données agrégées de leurs résidents
+    - Compatible avec import futur dataset Kaggle London Smart Meters
+    """
+    
+    # Résident propriétaire de cette lecture (RESIDENT seulement)
+    resident = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='consumption_readings',
+        db_index=True,
+        help_text="Résident auquel appartient cette lecture"
+    )
+    
+    # Identifiant du compteur/mètre
+    meter_id = models.CharField(
+        max_length=50,
+        db_index=True,
+        help_text="Identifiant unique du compteur intelligent"
+    )
+    
+    # Timestamp de la mesure
+    timestamp = models.DateTimeField(
+        db_index=True,
+        help_text="Moment de la mesure de consommation"
+    )
+    
+    # Consommation électrique
+    consumption_kwh = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        help_text="Consommation en kWh"
+    )
+    
+    # Coût estimé
+    cost_estimate = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+        help_text="Coût estimé basé sur consommation * tarif"
+    )
+    
+    # Type de tarif
+    tariff_type = models.CharField(
+        max_length=50,
+        default='standard',
+        choices=[
+            ('standard', 'Standard'),
+            ('peak', 'Heures pleines'),
+            ('off_peak', 'Heures creuses'),
+        ],
+        help_text="Type de tarification appliqué"
+    )
+    
+    # Métadonnées
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'energy_consumption_reading'
+        verbose_name = 'Lecture de consommation'
+        verbose_name_plural = 'Lectures de consommation'
+        ordering = ['-timestamp']
+        indexes = [
+            models.Index(fields=['resident', '-timestamp']),
+            models.Index(fields=['meter_id', '-timestamp']),
+            models.Index(fields=['timestamp']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['resident', 'meter_id', 'timestamp'],
+                name='unique_reading_per_resident_meter_timestamp'
+            )
+        ]
+    
+    def __str__(self):
+        return f"Reading {self.meter_id} - {self.resident.email} - {self.timestamp}"
+

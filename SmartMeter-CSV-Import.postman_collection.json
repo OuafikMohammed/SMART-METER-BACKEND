@@ -1,0 +1,278 @@
+{
+  "info": {
+    "_postman_id": "smartmeter-csv-import",
+    "name": "SmartMeter CSV Import",
+    "description": "Collection pour tester l'endpoint d'import CSV de consommation énergétique",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Auth - Obtenir Token ADMIN",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"username\": \"admin\",\n  \"password\": \"password123\"\n}"
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/auth/token/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "auth", "token", ""]
+        },
+        "description": "Obtenir un token JWT pour l'utilisateur ADMIN.\n\nRéponse attendue:\n```json\n{\n  \"access\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\",\n  \"refresh\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n}\n```\n\nCopier la valeur du champ `access` pour l'utiliser dans les tests suivants."
+      },
+      "response": []
+    },
+    {
+      "name": "2. CSV Import - Cas valide",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}",
+            "description": "Token JWT obtenu à l'étape 1. Remplacer {{admin_token}} par le token réel."
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "SMART-METER-BACKEND/example_import.csv",
+              "description": "Fichier CSV avec colonnes: LCLid, DateTime, KWH/hh (per 0.5 hour), anomaly_label"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/energy/import-csv/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "import-csv", ""]
+        },
+        "description": "Import réussi avec tous les paramètres valides.\n\nRéponse attendue (200 OK):\n```json\n{\n  \"success\": true,\n  \"message\": \"Import CSV complété\",\n  \"action_log_id\": 15,\n  \"statistics\": {\n    \"total_rows_processed\": 15,\n    \"foyers_created\": 3,\n    \"foyers_existing\": 12,\n    \"consommations_created\": 15,\n    \"consommations_skipped\": 0,\n    \"errors_count\": 0\n  },\n  \"errors\": []\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "3. CSV Import - Erreur: Pas d'authentification",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "SMART-METER-BACKEND/example_import.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/energy/import-csv/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "import-csv", ""]
+        },
+        "description": "Test: Requête sans token d'authentification.\n\nRéponse attendue (401 Unauthorized):\n```json\n{\n  \"detail\": \"Invalid token or authentication failed\"\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "4. CSV Import - Erreur: Utilisateur pas ADMIN",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{resident_token}}",
+            "description": "Token JWT d'un utilisateur RESIDENT (pas ADMIN)"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "SMART-METER-BACKEND/example_import.csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/energy/import-csv/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "import-csv", ""]
+        },
+        "description": "Test: Token RESIDENT au lieu d'ADMIN.\n\nRéponse attendue (403 Forbidden):\n```json\n{\n  \"error\": \"Accès refusé. Seuls les administrateurs peuvent importer des données.\"\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "5. CSV Import - Erreur: Pas de fichier",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": []
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/energy/import-csv/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "import-csv", ""]
+        },
+        "description": "Test: Aucun fichier fourni.\n\nRéponse attendue (400 Bad Request):\n```json\n{\n  \"error\": \"Le fichier CSV est requis (clé: \\\"file\\\")\"\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "6. CSV Import - Erreur: Mauvais format fichier",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": "README.md",
+              "description": "Fichier .md au lieu de .csv"
+            }
+          ]
+        },
+        "url": {
+          "raw": "http://localhost:8000/api/energy/import-csv/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "import-csv", ""]
+        },
+        "description": "Test: Fichier non-CSV.\n\nRéponse attendue (400 Bad Request):\n```json\n{\n  \"error\": \"Le fichier doit être un fichier CSV (.csv)\"\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "7. Vérifier les foyers créés",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/energy/foyers/",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "foyers", ""]
+        },
+        "description": "Vérifier que les foyers ont été créés après l'import.\n\nExemple de réponse:\n```json\n{\n  \"count\": 3,\n  \"next\": null,\n  \"previous\": null,\n  \"results\": [\n    {\n      \"id\": 1,\n      \"numero_foyer\": \"MAC000001\",\n      \"adresse\": \"Adresse non disponible - MAC000001\",\n      \"code_postal\": \"00000\",\n      \"ville\": \"Ville non disponible\",\n      \"puissance_souscrite\": 3.0,\n      \"created_at\": \"2024-05-12T10:30:00Z\",\n      \"updated_at\": \"2024-05-12T10:30:00Z\",\n      \"is_active\": true\n    },\n    ...\n  ]\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "8. Vérifier les consommations créées",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/energy/consommations/?ordering=-timestamp&limit=20",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "consommations", ""],
+          "query": [
+            {
+              "key": "ordering",
+              "value": "-timestamp"
+            },
+            {
+              "key": "limit",
+              "value": "20"
+            }
+          ]
+        },
+        "description": "Vérifier que les consommations ont été créées et liées aux foyers.\n\nExemple de réponse:\n```json\n{\n  \"count\": 15,\n  \"next\": null,\n  \"previous\": null,\n  \"results\": [\n    {\n      \"id\": 1,\n      \"foyer\": 1,\n      \"timestamp\": \"2024-05-12T03:00:00Z\",\n      \"kwh\": 0.498,\n      \"anomaly_label\": \"0\",\n      \"temperature\": null\n    },\n    ...\n  ]\n}\n```"
+      },
+      "response": []
+    },
+    {
+      "name": "9. Audit - Vérifier l'ActionLog",
+      "request": {
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Bearer {{admin_token}}"
+          }
+        ],
+        "url": {
+          "raw": "http://localhost:8000/api/energy/action-logs/?ordering=-timestamp&limit=5",
+          "protocol": "http",
+          "host": ["localhost"],
+          "port": "8000",
+          "path": ["api", "energy", "action-logs", ""],
+          "query": [
+            {
+              "key": "ordering",
+              "value": "-timestamp"
+            },
+            {
+              "key": "limit",
+              "value": "5"
+            }
+          ]
+        },
+        "description": "Vérifier que l'ActionLog a enregistré l'import avec toutes les statistiques.\n\nExemple de réponse:\n```json\n{\n  \"results\": [\n    {\n      \"id\": 15,\n      \"utilisateur\": 1,\n      \"action\": \"IMPORT_CSV\",\n      \"details\": {\n        \"filename\": \"example_import.csv\",\n        \"total_rows\": 15,\n        \"foyers_created\": 3,\n        \"foyers_existing\": 12,\n        \"consommations_created\": 15,\n        \"consommations_skipped\": 0,\n        \"errors_count\": 0\n      },\n      \"timestamp\": \"2024-05-12T10:30:00Z\",\n      \"ip_address\": \"127.0.0.1\"\n    }\n  ]\n}\n```"
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "admin_token",
+      "value": "",
+      "description": "Token JWT pour l'utilisateur ADMIN. À remplir après l'authentification (test 1)."
+    },
+    {
+      "key": "resident_token",
+      "value": "",
+      "description": "Token JWT pour l'utilisateur RESIDENT. À remplir si test 4 est exécuté."
+    }
+  ]
+}

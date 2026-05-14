@@ -321,6 +321,56 @@ GET  /api/conversations-ia/                      # Historique
 POST /api/conversations-ia/ask/                 # Poser une question
 ```
 
+### Import CSV de Consommations
+
+```
+POST /api/energy/import-csv/                    # Importer CSV (ADMIN only)
+```
+
+**Description**: Importer des données de consommation depuis un fichier CSV
+
+**Authentification**: Bearer token (ADMIN uniquement)
+
+**Paramètres**:
+- `file`: Fichier CSV (form-data)
+
+**Colonnes CSV requises**:
+- `LCLid`: Identifiant du foyer
+- `DateTime`: Timestamp (YYYY-MM-DD HH:MM:SS)
+- `KWH/hh (per 0.5 hour)`: Consommation en kWh (float)
+- `anomaly_label`: Label ML (int ou vide)
+
+**Exemple cURL**:
+```bash
+curl -X POST http://localhost:8000/api/energy/import-csv/ \
+  -H "Authorization: Bearer YOUR_TOKEN" \
+  -F "file=@data.csv"
+```
+
+**Réponse (200 OK)**:
+```json
+{
+  "success": true,
+  "message": "Import CSV complété",
+  "action_log_id": 15,
+  "statistics": {
+    "total_rows_processed": 100,
+    "foyers_created": 5,
+    "foyers_existing": 95,
+    "consommations_created": 100,
+    "consommations_skipped": 0,
+    "errors_count": 0
+  }
+}
+```
+
+**Erreurs possibles**:
+- `400`: Colonnes manquantes, fichier invalide
+- `403`: Utilisateur pas ADMIN
+- `500`: Erreur serveur lors de la lecture CSV
+
+Pour plus de détails, voir [IMPORT_CSV_GUIDE.md](../IMPORT_CSV_GUIDE.md)
+
 ## 📋 Règles de Gestion
 
 ### RG1 - Authentification Obligatoire
