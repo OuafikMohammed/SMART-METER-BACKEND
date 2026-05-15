@@ -4,6 +4,7 @@ from datetime import timedelta, datetime
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from django.db.models import Sum, Count, Q, F
+from django.contrib.auth import get_user_model
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
@@ -21,11 +22,14 @@ from .serializers import (
 from .utils_logging import get_client_ip, log_action
 from .services.ai_service import generer_reponse_ia
 
+# Get User model
+User = get_user_model()
+
 # Tarif kWh (2.5 DH par kWh - valeur par défaut)
 TARIF_KWH = 2.5
 
 
-class FoyerViewSet(viewsets.ReadOnlyModelViewSet):
+class FoyerViewSet(viewsets.ModelViewSet):
     serializer_class = FoyerSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -40,6 +44,15 @@ class FoyerViewSet(viewsets.ReadOnlyModelViewSet):
         if self.request.user.role == 'RESIDENT' and self.request.user.foyer:
             return Foyer.objects.filter(id=self.request.user.foyer.id)
         return Foyer.objects.none()
+
+    def destroy(self, request, *args, **kwargs):
+        """Only ADMIN users can delete foyers."""
+        if request.user.role != 'ADMIN':
+            return Response(
+                {'detail': 'Vous n\'avez pas les permissions pour supprimer des foyers.'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        return super().destroy(request, *args, **kwargs)
 
 
 class ConsommationViewSet(viewsets.ReadOnlyModelViewSet):
@@ -59,7 +72,7 @@ class ConsommationViewSet(viewsets.ReadOnlyModelViewSet):
                 role='RESIDENT'
             )
             managed_foyers = Foyer.objects.filter(
-                user__in=managed_residents
+                utilisateurs__in=managed_residents
             ).distinct()
             return Consommation.objects.filter(
                 foyer__in=managed_foyers
@@ -173,7 +186,7 @@ class AnomalieViewSet(viewsets.ModelViewSet):
                 role='RESIDENT'
             )
             managed_foyers = Foyer.objects.filter(
-                user__in=managed_residents
+                utilisateurs__in=managed_residents
             ).distinct()
             return Anomalie.objects.filter(
                 consommation__foyer__in=managed_foyers

@@ -369,10 +369,18 @@ class ConsumptionReadingSerializer(serializers.ModelSerializer):
 class ResidentSimpleSerializer(serializers.ModelSerializer):
     """
     Serializer simple pour afficher les résidents gérés par un admin.
+    Inclut le meter_id du premier compteur associé au résident.
     """
+    meter_id = serializers.SerializerMethodField()
+    
+    def get_meter_id(self, obj):
+        """Récupère le meter_id du premier enregistrement de consommation du résident."""
+        reading = obj.consumption_readings.first()
+        return reading.meter_id if reading else None
+    
     class Meta:
         model = User
-        fields = ['id', 'email', 'first_name', 'last_name', 'role']
+        fields = ['id', 'email', 'first_name', 'last_name', 'role', 'meter_id']
         read_only_fields = fields
 
 

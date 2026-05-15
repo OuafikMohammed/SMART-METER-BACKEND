@@ -19,6 +19,7 @@ from .views import (
 )
 from .views_smartmeter import (
     AdminResidentsListView as AdminResidentsListViewNew,
+    AdminResidentDetailView as AdminResidentDetailViewNew,
     AdminDashboardView,
     AdminFoyersListView as AdminFoyersListViewNew,
     AdminAnalyticsConsumptionView,
@@ -49,6 +50,7 @@ urlpatterns = [
     
     # Admin endpoints (new - Cahier des Charges)
     path('admin/residents/', AdminResidentsListViewNew.as_view(), name='admin-residents'),
+    path('admin/residents/<int:resident_id>/', AdminResidentDetailViewNew.as_view(), name='admin-resident-detail'),
     path('admin/dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
     path('admin/foyers/', AdminFoyersListViewNew.as_view(), name='admin-foyers'),
     
